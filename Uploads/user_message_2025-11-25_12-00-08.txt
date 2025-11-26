@@ -1,0 +1,316 @@
+sim  quero  melhorar  , ele   sim  com  algumas  coisas    aqui esta   o que eu  quero   # Vision Trading Agent — README.md
+
+## **Visão Geral**
+
+Este projeto implementa um **Agente de Visão Inteligente** capaz de:
+
+* Assistir automaticamente todos os vídeos de um canal/playlist do YouTube.
+* Entender a técnica que o professor demonstra: riscos, setas, textos, gestos, níveis, regiões, entradas e saídas.
+* Converter tudo isso em **features temporais**, analisar com modelos de Machine Learning e classificar em **ENTER / EXIT / IGNORE**.
+* Enviar sinais diretamente para seu painel/API de trading.
+* Evoluir continuamente através de re‑treinamento periódico com novos dados.
+
+Ele funciona como se fosse “você assistindo às aulas”, aprendendo a mesma técnica e depois aplicando no seu robô de trading.
+
+---
+
+# **1. Arquitetura Geral do Sistema**
+
+O Agente segue o pipeline abaixo:
+
+1. **Download dos vídeos** da playlist do professor.
+2. **Leitura frame‑a‑frame** do vídeo.
+3. **Processamento visual**:
+
+   * MediaPipe: detecção de mãos e gestos.
+   * OpenCV: detecção de riscos e traços (frame differencing).
+   * YOLO (opcional): detecção de setas/linhas.
+   * OCR: extração de texto (níveis, preços, RR, comentários).
+4. Construção de um **vetor de features** para cada frame.
+5. Organização dessas features num **buffer sequencial** (SEQ_LEN).
+6. Inferência do **modelo sequencial (LSTM/Transformer)**.
+7. Classificação da ação: `ENTER`, `EXIT`, `IGNORE`.
+8. Execução da ação via API (se permitido pelo modo de segurança).
+9. Armazenamento de logs completos e material de auditoria.
+10. Acúmulo de dados para **aprendizado contínuo**.
+
+---
+
+# **2. Modos de Operação**
+
+O agente possui três modos:
+
+### **SHADOW (padrão)**
+
+* Assiste ao vídeo.
+* Gera sinais.
+* Não executa nada.
+* Apenas registra logs.
+
+### **PAPER**
+
+* Gera sinais e envia para o painel em modo simulado.
+
+### **LIVE**
+
+* Envia ordens reais, **mas sempre passando por validações de segurança**:
+
+  * limite diário de trades
+  * limite de perda
+  * limite de exposição
+  * horário de mercado
+  * travas de segurança
+
+---
+
+# **3. Pipeline Passo a Passo (Comportamento do Agente)**
+
+## **3.1 Baixar e Preparar Vídeos**
+
+* Usar `yt-dlp` para baixar toda a playlist.
+* Salvar na pasta `downloads_videos/`.
+* Criar subpastas por vídeo com logs, frames e auditoria.
+
+---
+
+## **3.2 Analisar Cada Frame**
+
+Para cada frame (ou a cada `FRAME_STEP`):
+
+### A) MediaPipe – detecção de mãos
+
+o Agente extrai:
+
+* posição 3D (x,y,z) dos 21 pontos de cada mão
+* mão esquerda/direita
+* orientações de gesto (puxar, empurrar, apontar)
+
+### B) Detecção de Traços e Riscos
+
+Usando `absdiff(prev_gray, gray)` o Agente detecta:
+
+* novas linhas desenhadas
+* riscos do professor
+* círculos, retângulos, marcações improvisadas
+
+### C) Detecção de Setas e Formas
+
+* modo heurístico (OpenCV + HoughLines + convexity)
+* modo YOLO (caso um modelo tenha sido treinado)
+
+### D) OCR – leitura de texto e números
+
+O Agente extrai:
+
+* níveis de preço
+* RR
+* palavras-chave do professor
+
+### E) Vetor de Features
+
+Cada frame vira um vetor fixo, contendo:
+
+* landmarks das mãos (até 2 mãos)
+* quantidade de traços
+* média das áreas dos traços
+* presença de texto
+* tamanho do texto
+* cursor (se existir)
+
+---
+
+## **3.3 Sequência Temporal (SEQ_LEN)**
+
+Quando o buffer atinge o tamanho configurado:
+
+* monta o tensor `(SEQ_LEN, FEATURE_DIM)`
+* envia para o modelo sequencial
+* recebe: `{action, confidence}`
+
+---
+
+## **3.4 Decisão e Execução**
+
+### Se `action != IGNORE` **e** `confidence >= CONF_THRESHOLD`:
+
+1. passa pelas validações de risco
+2. se tudo ok → enviar sinal para o painel via TradeAdapter
+
+**Payload JSON enviado ao painel:**
+
+```json
+{
+  "action": "ENTER",
+  "timestamp": "2025-11-25T12:45:32Z",
+  "confidence": 0.82,
+  "symbol": "WIN$",
+  "video_id": "abc123",
+  "frame_index": 2400,
+  "features_summary": {
+    "hands": 1,
+    "draw_count": 2,
+    "ocr": "1.3450"
+  },
+  "model_version": "model_seq_v20251125.h5"
+}
+```
+
+---
+
+# **4. Aprendizado Contínuo (Evolução)**
+
+O Agente evolui com o tempo de 3 maneiras:
+
+## **4.1 Shadow Learning (Automático)**
+
+* Em shadow/paper, registra cada sequência e o resultado simulado.
+* Usa sequências que geraram lucro/prejuízo real → **auto‑labeling**.
+
+## **4.2 Re-treinamento Periódico**
+
+* A cada semana, roda re‑treino com novos dados.
+* Gera novo `model_seq_vX.h5`.
+* Realiza validação antes de promover o novo modelo para uso.
+
+## **4.3 Aprendizado Online (opcional)**
+
+* Pequenos ajustes (mini‑batches) após rodar continuamente.
+
+---
+
+# **5. Ferramentas Utilizadas**
+
+* **OpenCV** – vídeo, detecção de diferenças, filtros
+* **MediaPipe Holistic** – landmarks de mãos
+* **Tesseract OCR** – leitura de texto
+* **YOLO (Ultralytics)** – detecção robusta de setas/linhas
+* **TensorFlow/Keras** – modelo sequencial (LSTM / Transformer)
+* **yt-dlp** – download de vídeos do YouTube
+* **Python** – integração geral
+
+---
+
+# **6. Estrutura do Projeto**
+
+```
+/project
+  /videos/{video_id}/
+    frames/
+    logs/
+    features/
+    audit/
+  /models/
+    model_seq_vYYYYMMDD.h5
+    yolo_arrows.pt
+  /features/
+    seq_00001.npz
+  /scripts/
+    vision_trading_agent.py
+    batch_process_playlist.py
+    train_seq.py
+    annotate_tool.py
+  agent_logs.jsonl
+  README.md
+```
+
+---
+
+# **7. Como Rodar o Projeto**
+
+## **7.1 Criar Ambiente**
+
+```
+python -m venv venv
+source venv/bin/activate   # Linux/Mac
+venv\Scripts\activate      # Windows
+```
+
+## **7.2 Instalar Dependências**
+
+```
+pip install opencv-python mediapipe tensorflow numpy pytesseract yt-dlp imageio tqdm pandas ultralytics
+```
+
+Instalar Tesseract OCR no sistema (Windows/Linux/Mac).
+
+---
+
+# **8. Processar Playlist Completa**
+
+```
+python batch_process_playlist.py
+```
+
+Ele irá:
+
+* baixar todos os vídeos
+* processar um por um
+* gerar logs e features automaticamente
+
+---
+
+# **9. Treinar Modelo Sequencial**
+
+```
+python vision_trading_agent.py --mode train_seq
+```
+
+Usa arquivos `.npz` do diretório `features/`.
+
+---
+
+# **10. Executar Pipeline em Um Vídeo**
+
+```
+python vision_trading_agent.py --mode pipeline --video "meu_video.mp4"
+```
+
+Abre janela com overlay e salva logs.
+
+---
+
+# **11. Segurança Obrigatória**
+
+* Sempre começar no modo SHADOW.
+* Habilitar PAPER somente após validação.
+* Live apenas após métricas comprovadas.
+* Travas de risco ativas:
+
+  * máximo de trades por dia
+  * stop global
+  * limitação de capital
+
+---
+
+# **12. Métricas Mínimas Para Ativar LIVE**
+
+* Precision(ENTER) ≥ 0.70
+* Recall(ENTER) ≥ 0.60
+* PnL positivo em 14 dias simulados
+* Drawdown baixo
+* Logs completos e sem falhas
+
+---
+
+# **13. Resumo Final (Descrição do Agente)**
+
+O Agente é um sistema de visão computacional capaz de:
+
+* Estudar todos os vídeos do professor passo a passo.
+* Entender marcações, gestos, sinais e explicações.
+* Aprender a técnica completa.
+* Transformar isso em decisões de trading.
+* Integrar ao painel via API.
+* Evoluir continuamente ao longo do tempo.
+
+É literalmente um assistente que **vê, entende, aprende e aplica**.
+
+---
+
+Se quiser, posso gerar também:
+
+* Documentação técnica para devs
+* Versão em PDF
+* Fluxograma visual completo
+* Diagrama de arquitetura
+ nao quero  que  quebre  nada  no  contesto ou muda o deziner  quero esta  funçao  integrada  no sistem    onde  este  agente   faça  tudo automaticamete   e  aplica    nas operaçao     em temp real

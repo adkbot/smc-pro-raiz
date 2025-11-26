@@ -1,0 +1,130 @@
+═══════════════════════════════════════════════════════════════
+  🎯 GUIA RÁPIDO: Aplicar Configurações no Supabase (8 minutos)
+═══════════════════════════════════════════════════════════════
+
+✅ TUDO JÁ ESTÁ RODANDO:
+  • Frontend: http://localhost:8080
+  • Backend: http://localhost:3000
+  • Código Python: 100% pronto
+
+⏳ FALTA APENAS:
+  Aplicar 2 coisas no Supabase Dashboard (super rápido!)
+
+───────────────────────────────────────────────────────────────
+📋 PASSO 1: Aplicar Migrações SQL (3 minutos)
+───────────────────────────────────────────────────────────────
+
+1. Abra no navegador:
+   👉 https://supabase.com/dashboard/project/zfefnlibzgkfbgdtagho/editor
+
+2. No menu lateral esquerdo, clique em:
+   📝 "SQL Editor"
+
+3. Clique no botão:
+   ➕ "New Query"
+
+4. Abra o arquivo e copie TODO o conteúdo:
+   📁 /home/ubuntu/smc-alpha-dashboard-main/supabase/migrations/20251125120000_create_vision_agent_tables.sql
+
+   Você pode ver o conteúdo com:
+   cat /home/ubuntu/smc-alpha-dashboard-main/supabase/migrations/20251125120000_create_vision_agent_tables.sql
+
+5. Cole todo o SQL no editor do Supabase
+
+6. Clique em "Run" (botão verde) ou pressione Ctrl+Enter
+
+7. Aguarde a mensagem de sucesso ✅
+   "Success. No rows returned"
+
+✅ PRONTO! 3 novas tabelas criadas:
+   • vision_agent_videos
+   • vision_agent_settings
+   • vision_agent_signals
+
+───────────────────────────────────────────────────────────────
+📋 PASSO 2: Deploy da Edge Function (5 minutos)
+───────────────────────────────────────────────────────────────
+
+1. Abra no navegador:
+   👉 https://supabase.com/dashboard/project/zfefnlibzgkfbgdtagho/functions
+
+2. Clique no botão:
+   ➕ "Create a new function"
+
+3. Preencha os campos:
+   Nome: vision-agent-signal
+   (deixe os outros campos como estão)
+
+4. Abra o arquivo e copie TODO o conteúdo:
+   📁 /home/ubuntu/smc-alpha-dashboard-main/supabase/functions/vision-agent-signal/index.ts
+
+   Você pode ver o conteúdo com:
+   cat /home/ubuntu/smc-alpha-dashboard-main/supabase/functions/vision-agent-signal/index.ts
+
+5. Cole todo o código TypeScript no editor
+
+6. ⚠️ IMPORTANTE: Desmarque a opção:
+   ☐ "Verify JWT"
+   (Deve ficar DESMARCADA!)
+
+7. Clique em "Deploy function" (botão verde)
+
+8. Aguarde o deploy (pode levar 1-2 minutos)
+
+9. Quando aparecer "Deployed" ✅, está pronto!
+
+───────────────────────────────────────────────────────────────
+🎉 FEITO! Sistema 100% Operacional
+───────────────────────────────────────────────────────────────
+
+Agora é só usar:
+
+1. Acesse: http://localhost:8080
+2. Faça login ou registre-se
+3. Vá em "Vision Agent Settings" ou "Configurações do Vision Agent"
+4. Configure:
+   • URL da playlist/canal do YouTube
+   • Modo: SHADOW (padrão, seguro)
+   • Ative "Auto-process"
+5. Salve as configurações
+
+🤖 O agente começará automaticamente a:
+   ✓ Baixar vídeos da playlist
+   ✓ Analisar frame por frame
+   ✓ Detectar gestos, traços, texto, setas
+   ✓ Classificar ENTER/EXIT/IGNORE
+   ✓ Gerar sinais em tempo real
+   ✓ Enviar para o painel
+
+───────────────────────────────────────────────────────────────
+📊 URLs Importantes
+───────────────────────────────────────────────────────────────
+
+🌐 Dashboard Frontend:
+   http://localhost:8080
+
+🔧 Backend API:
+   http://localhost:3000
+
+📚 API Documentação:
+   http://localhost:3000/api-docs
+
+🏥 Health Check:
+   http://localhost:3000/api/monitoring/health
+
+🎮 Supabase Dashboard:
+   https://supabase.com/dashboard/project/zfefnlibzgkfbgdtagho
+
+───────────────────────────────────────────────────────────────
+💡 Dicas
+───────────────────────────────────────────────────────────────
+
+• Use modo SHADOW por 7-14 dias antes de mudar para PAPER
+• O agente aprende continuamente e melhora com o tempo
+• Todos os logs são salvos automaticamente
+• Validações de segurança estão sempre ativas
+• Você pode pausar/iniciar o agente a qualquer momento
+
+🚀 Boa sorte com seu Vision Trading Agent!
+
+═══════════════════════════════════════════════════════════════

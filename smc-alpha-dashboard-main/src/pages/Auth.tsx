@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
@@ -19,13 +20,13 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const { user, loading: authLoading } = useAuth();
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate("/dashboard");
-      }
-    });
-  }, [navigate]);
+    if (!authLoading && user) {
+      navigate("/dashboard");
+    }
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +73,7 @@ const Auth = () => {
       const isUserExists = error.message.includes("User already registered");
       toast({
         title: "Erro no cadastro",
-        description: isUserExists 
+        description: isUserExists
           ? "Este email já está cadastrado. Use a aba LOGIN para acessar sua conta."
           : error.message,
         variant: "destructive",

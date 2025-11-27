@@ -79,6 +79,9 @@ export class SupabaseService implements OnApplicationBootstrap {
             youtube_channel_id TEXT,
             check_interval_minutes INTEGER DEFAULT 15,
             max_videos_per_run INTEGER DEFAULT 5,
+            trading_symbol TEXT DEFAULT 'BTCUSDT',
+            trading_interval TEXT DEFAULT '1m',
+            trading_platform TEXT DEFAULT 'BINANCE',
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
           );
@@ -95,11 +98,22 @@ export class SupabaseService implements OnApplicationBootstrap {
             youtube_channel_id TEXT,
             check_interval_minutes INTEGER DEFAULT 15,
             max_videos_per_run INTEGER DEFAULT 5,
+            trading_symbol TEXT DEFAULT 'BTCUSDT',
+            trading_interval TEXT DEFAULT '1m',
+            trading_platform TEXT DEFAULT 'BINANCE',
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
           );
         `);
       }
+
+      // Add columns if they don't exist (migration for existing tables)
+      await this.executeSqlDirect(`
+        ALTER TABLE vision_agent_settings 
+        ADD COLUMN IF NOT EXISTS trading_symbol TEXT DEFAULT 'BTCUSDT',
+        ADD COLUMN IF NOT EXISTS trading_interval TEXT DEFAULT '1m',
+        ADD COLUMN IF NOT EXISTS trading_platform TEXT DEFAULT 'BINANCE';
+      `);
 
       // Create processed_videos table if not exists
       await this.executeSqlDirect(`
@@ -203,6 +217,9 @@ export class SupabaseService implements OnApplicationBootstrap {
             auto_process_enabled: false,
             check_interval_minutes: 15,
             max_videos_per_run: 5,
+            trading_symbol: 'BTCUSDT',
+            trading_interval: '1m',
+            trading_platform: 'BINANCE'
           });
 
         if (error && !error.message.includes('duplicate key')) {

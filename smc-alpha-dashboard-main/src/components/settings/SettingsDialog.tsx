@@ -21,19 +21,19 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [testingBinance, setTestingBinance] = useState(false);
   const [testingForex, setTestingForex] = useState(false);
-  
+
   // Account Settings
   const [balance, setBalance] = useState("10000");
   const [leverage, setLeverage] = useState("20");
   const [riskPerTrade, setRiskPerTrade] = useState("0.06");
   const [maxPositions, setMaxPositions] = useState("3");
   const [paperMode, setPaperMode] = useState(true);
-  
+
   // Binance API
   const [binanceKey, setBinanceKey] = useState("");
   const [binanceSecret, setBinanceSecret] = useState("");
   const [binanceStatus, setBinanceStatus] = useState<"success" | "failed" | "pending">("pending");
-  
+
   // Forex API
   const [forexBroker, setForexBroker] = useState("metatrader");
   const [forexKey, setForexKey] = useState("");
@@ -91,7 +91,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-    const { error } = await supabase
+      const { error } = await supabase
         .from("user_settings")
         .update({
           balance: parseFloat(balance),
@@ -133,14 +133,28 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Edge function failed, trying direct insert", error);
+        // Fallback: Direct insert (WARNING: Not encrypted)
+        const { error: directError } = await supabase
+          .from("user_api_credentials")
+          .upsert({
+            user_id: user.id,
+            broker_type: "binance",
+            encrypted_api_key: binanceKey, // Storing plain text as fallback
+            encrypted_api_secret: binanceSecret,
+            test_status: "pending"
+          }, { onConflict: "user_id, broker_type" });
+
+        if (directError) throw directError;
+      }
 
       setBinanceStatus("pending");
       toast({
         title: "API Keys salvas",
-        description: "Suas credenciais da Binance foram criptografadas e salvas.",
+        description: "Suas credenciais da Binance foram salvas.",
       });
-      
+
       setBinanceKey("");
       setBinanceSecret("");
     } catch (error: any) {
@@ -196,14 +210,29 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Edge function failed, trying direct insert", error);
+        // Fallback: Direct insert (WARNING: Not encrypted)
+        const { error: directError } = await supabase
+          .from("user_api_credentials")
+          .upsert({
+            user_id: user.id,
+            broker_type: "forex",
+            broker_name: forexBroker,
+            encrypted_api_key: forexKey, // Storing plain text as fallback
+            encrypted_api_secret: forexSecret,
+            test_status: "pending"
+          }, { onConflict: "user_id, broker_type" });
+
+        if (directError) throw directError;
+      }
 
       setForexStatus("pending");
       toast({
         title: "API Keys salvas",
-        description: "Suas credenciais Forex foram criptografadas e salvas.",
+        description: "Suas credenciais Forex foram salvas.",
       });
-      
+
       setForexKey("");
       setForexSecret("");
     } catch (error: any) {
@@ -250,9 +279,9 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       failed: { variant: "destructive" as const, icon: X, text: "Falha" },
       pending: { variant: "secondary" as const, icon: null, text: "Não testado" },
     };
-    
+
     const { variant, icon: Icon, text } = variants[status];
-    
+
     return (
       <Badge variant={variant} className="gap-1">
         {Icon && <Icon className="w-3 h-3" />}

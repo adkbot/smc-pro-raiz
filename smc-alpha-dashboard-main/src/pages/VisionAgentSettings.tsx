@@ -33,8 +33,29 @@ const VisionAgentSettings = () => {
     max_video_duration_seconds: 3600,
     frame_step: 5,
     sequence_length: 30,
+    trading_symbol: "BTCUSDT",
+    trading_interval: "1m",
+    trading_platform: "BINANCE",
   });
   const [videos, setVideos] = useState<VisionAgentVideo[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+
+  const handleUnlock = () => {
+    if (password === "28034050An") {
+      setIsAuthenticated(true);
+      toast({
+        title: "🔓 Acesso Liberado",
+        description: "Você agora tem acesso às configurações.",
+      });
+    } else {
+      toast({
+        title: "❌ Senha Incorreta",
+        description: "A senha fornecida não é válida.",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -47,10 +68,12 @@ const VisionAgentSettings = () => {
     if (!user) return;
 
     try {
+      // Fetch GLOBAL settings (the first one created, effectively system settings)
       const { data, error } = await supabase
         .from("vision_agent_settings")
         .select("*")
-        .eq("user_id", user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
@@ -59,6 +82,9 @@ const VisionAgentSettings = () => {
 
       if (data) {
         setSettings(data);
+      } else {
+        // If no settings exist, create one for the current user (Admin)
+        // This will become the global setting
       }
     } catch (error: any) {
       toast({
@@ -101,35 +127,34 @@ const VisionAgentSettings = () => {
         throw new Error("Máximo de sinais por dia deve ser no mínimo 1");
       }
 
-      // Verificar se já existe
-      const { data: existing } = await supabase
-        .from("vision_agent_settings")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Prepare settings for save (remove id if present for insert, keep for update)
+      const { id, ...settingsData } = settings;
+      const cleanSettings = {
+        ...settingsData,
+        updated_at: new Date().toISOString(),
+      };
 
-      if (existing) {
-        // Atualizar
-        const { error } = await supabase
+      let result;
+
+      if (settings.id) {
+        // Update existing global settings
+        result = await supabase
           .from("vision_agent_settings")
-          .update({
-            ...settings,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", user.id);
-
-        if (error) throw error;
+          .update(cleanSettings)
+          .eq("id", settings.id);
+        error = updateError;
       } else {
-        // Criar
-        const { error } = await supabase
+        // Create new global settings
+        const { error: insertError } = await supabase
           .from("vision_agent_settings")
           .insert({
-            ...settings,
-            user_id: user.id,
+            ...cleanSettings,
+            user_id: user.id, // Assign to the admin user on creation
           });
-
-        if (error) throw error;
+        error = insertError;
       }
+
+      if (error) throw error;
 
       toast({
         title: "✅ Configurações salvas",
@@ -164,6 +189,45 @@ const VisionAgentSettings = () => {
       </Badge>
     );
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background p-8 flex items-center justify-center">
+        <Card className="p-6 w-full max-w-md">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Eye className="w-6 h-6 text-primary" />
+              <h1 className="text-xl font-bold">Acesso Restrito</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Digite a senha de administrador para acessar as configurações do Vision Agent.
+            </p>
+            {user?.email !== "ks10bot@gmail.com" && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-500">
+                ⚠️ Apenas a conta ADMIN (ks10bot@gmail.com) pode alterar estas configurações.
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Senha..."
+                onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+              />
+              <Button onClick={handleUnlock} disabled={user?.email !== "ks10bot@gmail.com"}>
+                Desbloquear
+              </Button>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar ao Dashboard
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -260,6 +324,66 @@ const VisionAgentSettings = () => {
                     </div>
                   </div>
                 )}
+
+                <Separator />
+
+                {/* Trading Platform */}
+                <div className="space-y-2">
+                  <Label>Plataforma de Negociação</Label>
+                  <Select
+                    value={settings.trading_platform || "BINANCE"}
+                    onValueChange={(value: any) => setSettings({ ...settings, trading_platform: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BINANCE">Binance (Crypto)</SelectItem>
+                      <SelectItem value="FOREX">Forex (MetaTrader/Oanda)</SelectItem>
+                      <SelectItem value="B3">B3 (Bovespa)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Selecione a plataforma onde as operações serão realizadas
+                  </p>
+                </div>
+
+                {/* Trading Symbol */}
+                <div className="space-y-2">
+                  <Label>Ativo para Operação (Scanner)</Label>
+                  <Input
+                    value={settings.trading_symbol || "BTCUSDT"}
+                    onChange={(e) => setSettings({ ...settings, trading_symbol: e.target.value.toUpperCase() })}
+                    placeholder={settings.trading_platform === 'FOREX' ? 'EURUSD' : 'BTCUSDT'}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Símbolo do ativo (ex: BTCUSDT para Binance, EURUSD para Forex)
+                  </p>
+                </div>
+
+                {/* Trading Interval */}
+                <div className="space-y-2">
+                  <Label>Timeframe (Scanner)</Label>
+                  <Select
+                    value={settings.trading_interval || "1m"}
+                    onValueChange={(value: any) => setSettings({ ...settings, trading_interval: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1m">1 Minuto</SelectItem>
+                      <SelectItem value="5m">5 Minutos</SelectItem>
+                      <SelectItem value="15m">15 Minutos</SelectItem>
+                      <SelectItem value="1h">1 Hora</SelectItem>
+                      <SelectItem value="4h">4 Horas</SelectItem>
+                      <SelectItem value="1d">1 Dia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Intervalo de tempo para análise em tempo real
+                  </p>
+                </div>
 
                 <Separator />
 

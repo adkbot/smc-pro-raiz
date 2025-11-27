@@ -44,6 +44,14 @@ class FeatureExtractor:
         
         # Previous frame for motion detection
         self.prev_gray = None
+        
+        # Cache for expensive features
+        self.last_text_features = {
+            'text_detected': False,
+            'text': '',
+            'numbers': [],
+            'words': []
+        }
     
     def extract_features(self, frame: np.ndarray, frame_idx: int) -> Dict:
         """
@@ -59,11 +67,19 @@ class FeatureExtractor:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
+        # Determine if we should run OCR this frame
+        # We run OCR only every OCR_INTERVAL processed frames to save time
+        processed_frame_count = frame_idx // config.FRAME_STEP
+        run_ocr = (processed_frame_count % config.OCR_INTERVAL == 0)
+        
+        if run_ocr:
+            self.last_text_features = self._extract_text(gray_frame)
+        
         features = {
             'frame_idx': frame_idx,
             'hands': self._extract_hands(rgb_frame),
             'drawings': self._extract_drawings(gray_frame),
-            'text': self._extract_text(gray_frame),
+            'text': self.last_text_features, # Use current or cached text features
             'arrows': self._extract_arrows(frame),
             'motion': self._extract_motion(gray_frame)
         }

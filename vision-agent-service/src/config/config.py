@@ -17,7 +17,8 @@ class VisionAgentConfig:
     MODE: str = os.getenv("AGENT_MODE", "LIVE")  # SHADOW, PAPER, LIVE
     
     # Video Processing
-    FRAME_STEP: int = int(os.getenv("FRAME_STEP", "30"))  # Process every N frames
+    FRAME_STEP: int = int(os.getenv("FRAME_STEP", "60"))  # Process every N frames (default 60 = ~2 seconds at 30fps)
+    OCR_INTERVAL: int = int(os.getenv("OCR_INTERVAL", "5"))  # Run OCR only every N processed frames
     MIN_VIDEO_DURATION: int = int(os.getenv("MIN_VIDEO_DURATION", "60"))  # seconds
     MAX_VIDEO_DURATION: int = int(os.getenv("MAX_VIDEO_DURATION", "3600"))  # seconds
     
@@ -45,7 +46,9 @@ class VisionAgentConfig:
     MAX_SIGNALS_PER_DAY: int = int(os.getenv("MAX_SIGNALS_PER_DAY", "50"))
     
     # Trading Parameters
-    DEFAULT_ASSET: str = "BTCUSDT"
+    DEFAULT_ASSET: str = os.getenv("TRADING_SYMBOL", "BTCUSDT")
+    TIMEFRAME: str = os.getenv("TRADING_INTERVAL", "1m")
+    PLATFORM: str = os.getenv("TRADING_PLATFORM", "BINANCE")
     DEFAULT_RR: float = 2.0  # Risk:Reward ratio
     
     # Directories

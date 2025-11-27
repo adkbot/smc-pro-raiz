@@ -73,6 +73,14 @@ export class VisionAgentService implements OnApplicationBootstrap {
 
       this.logger.log(`🐍 Starting Python process: ${mainScriptPath}`);
 
+      // Fetch settings to pass as environment variables
+      const settings = await this.supabaseService.getSettings();
+      const tradingSymbol = settings?.trading_symbol || 'BTCUSDT';
+      const tradingInterval = settings?.trading_interval || '1m';
+      const tradingPlatform = settings?.trading_platform || 'BINANCE';
+
+      this.logger.log(`⚙️ Agent Config: Platform=${tradingPlatform}, Symbol=${tradingSymbol}, Interval=${tradingInterval}`);
+
       // Spawn Python process
       this.pythonProcess = spawn('python', ['-m', 'src.main'], {
         cwd: pythonServicePath,
@@ -81,6 +89,9 @@ export class VisionAgentService implements OnApplicationBootstrap {
           PYTHONUNBUFFERED: '1',
           PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: 'python',
           AGENT_MODE: 'LIVE',
+          TRADING_SYMBOL: tradingSymbol,
+          TRADING_INTERVAL: tradingInterval,
+          TRADING_PLATFORM: tradingPlatform,
         },
       });
 

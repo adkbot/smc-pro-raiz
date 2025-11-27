@@ -376,7 +376,13 @@ export const VisionAgentPanel = () => {
         {/* Botões */}
         <div className="grid grid-cols-2 gap-2 pt-2">
           <Button
-            onClick={toggleAgent}
+            onClick={() => {
+              if (isAuthenticated) {
+                toggleAgent();
+              } else {
+                setShowPasswordInput(true);
+              }
+            }}
             disabled={loading}
             size="sm"
             variant={agentStatus.enabled ? "destructive" : "default"}

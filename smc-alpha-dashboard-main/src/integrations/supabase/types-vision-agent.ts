@@ -38,6 +38,9 @@ export interface VisionAgentSettings {
   max_video_duration_seconds: number;
   frame_step: number;
   sequence_length: number;
+  trading_symbol: string;
+  trading_interval: string;
+  trading_platform: string;
   api_token: string | null;
   settings_json: Record<string, any>;
   created_at: string;

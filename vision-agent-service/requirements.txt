@@ -5,6 +5,7 @@ mediapipe>=0.10.0
 pytesseract>=0.3.10
 yt-dlp>=2023.11.16
 requests>=2.31.0
+yfinance>=0.2.36
 
 # Machine Learning
 tensorflow>=2.14.0

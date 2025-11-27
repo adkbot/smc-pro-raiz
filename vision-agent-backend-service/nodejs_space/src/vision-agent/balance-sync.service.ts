@@ -58,6 +58,9 @@ export class BalanceSyncService {
     }
 
     private async syncUserBalance(user: { user_id: string, api_key: string, api_secret: string }) {
+        let fetchSuccess = false;
+        let totalUsdt = 0;
+
         try {
             // @ts-ignore
             const exchange = new ccxt.binance({
@@ -68,10 +71,10 @@ export class BalanceSyncService {
             });
 
             // 1. Fetch Spot Balance
-            let totalUsdt = 0;
             try {
                 const spotBalance = await exchange.fetchBalance();
                 totalUsdt += spotBalance.total['USDT'] || 0;
+                fetchSuccess = true;
             } catch (e) {
                 this.logger.warn(`Failed to fetch Spot balance for user ${user.user_id}: ${e.message}`);
             }
@@ -87,8 +90,14 @@ export class BalanceSyncService {
                 });
                 const futuresBalance = await futuresExchange.fetchBalance();
                 totalUsdt += futuresBalance.total['USDT'] || 0;
+                fetchSuccess = true;
             } catch (e) {
                 // Ignore error if futures are not enabled or permission denied
+            }
+
+            if (!fetchSuccess) {
+                this.logger.warn(`Skipping balance update for user ${user.user_id} because both Spot and Futures fetch failed.`);
+                return;
             }
 
             const supabase = this.supabaseService.getClient();

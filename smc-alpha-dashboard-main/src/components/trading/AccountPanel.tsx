@@ -67,7 +67,8 @@ export const AccountPanel = () => {
     return () => clearInterval(interval);
   }, [user]);
 
-  // Force Real Account Mode
+  // Force Real Account Mode removed to allow Paper Mode
+  /*
   useEffect(() => {
     const enforceRealAccount = async () => {
       if (!user) return;
@@ -91,6 +92,7 @@ export const AccountPanel = () => {
       enforceRealAccount();
     }
   }, [user, paperMode]);
+  */
 
   return (
     <div className="p-4 border-b border-border bg-card/50">

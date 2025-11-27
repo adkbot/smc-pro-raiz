@@ -11,7 +11,7 @@ export class MonitoringController {
   constructor(
     private readonly metricsService: MetricsService,
     private readonly visionAgentService: VisionAgentService,
-  ) {}
+  ) { }
 
   @Get('metrics')
   @ApiOperation({ summary: 'Get Prometheus metrics' })
@@ -23,8 +23,8 @@ export class MonitoringController {
   @Get('dashboard')
   @ApiOperation({ summary: 'Get monitoring dashboard data' })
   @ApiResponse({ status: 200, description: 'Returns comprehensive system status' })
-  getDashboard() {
-    const agentStatus = this.visionAgentService.getStatus();
+  async getDashboard() {
+    const agentStatus = await this.visionAgentService.getStatus();
     const systemMetrics = this.metricsService.getSystemMetrics();
 
     return {

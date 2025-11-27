@@ -46,11 +46,33 @@ export class BalanceSyncService {
                 apiKey: user.api_key,
                 secret: user.api_secret,
                 enableRateLimit: true,
+                options: { recvWindow: 60000 },
             });
 
-            // Fetch balance
-            const balance = await exchange.fetchBalance();
-            const usdtBalance = balance.total['USDT'] || 0;
+            // 1. Fetch Spot Balance
+            let totalUsdt = 0;
+            try {
+                const spotBalance = await exchange.fetchBalance();
+                totalUsdt += spotBalance.total['USDT'] || 0;
+            } catch (e) {
+                this.logger.warn(`Failed to fetch Spot balance for user ${user.user_id}: ${e.message}`);
+            }
+
+            // 2. Fetch Futures Balance
+            try {
+                // @ts-ignore
+                const futuresExchange = new ccxt.binance({
+                    apiKey: user.api_key,
+                    secret: user.api_secret,
+                    enableRateLimit: true,
+                    options: { defaultType: 'future', recvWindow: 60000 },
+                });
+                const futuresBalance = await futuresExchange.fetchBalance();
+                totalUsdt += futuresBalance.total['USDT'] || 0;
+            } catch (e) {
+                // Ignore error if futures are not enabled or permission denied
+                // this.logger.warn(`Failed to fetch Futures balance for user ${user.user_id}: ${e.message}`);
+            }
 
             const supabase = this.supabaseService.getClient();
             if (!supabase) {
@@ -60,13 +82,13 @@ export class BalanceSyncService {
             // Update Supabase
             const { error } = await supabase
                 .from('user_settings')
-                .update({ balance: usdtBalance, updated_at: new Date().toISOString() })
+                .update({ balance: totalUsdt, updated_at: new Date().toISOString() })
                 .eq('user_id', user.user_id);
 
             if (error) {
                 this.logger.error(`Failed to update balance for user ${user.user_id}: ${error.message}`);
             } else {
-                this.logger.debug(`Updated balance for user ${user.user_id}: ${usdtBalance} USDT`);
+                this.logger.debug(`Updated balance for user ${user.user_id}: ${totalUsdt} USDT (Spot + Futures)`);
             }
 
         } catch (error) {

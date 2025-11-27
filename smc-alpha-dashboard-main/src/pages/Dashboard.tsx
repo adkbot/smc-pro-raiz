@@ -16,29 +16,34 @@ const Dashboard = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <TopBar 
+      <TopBar
         symbol={symbol}
         interval={interval}
         onSymbolChange={setSymbol}
         onIntervalChange={setInterval}
       />
-      
+
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 relative">
-          <TradingChart 
-            symbol={symbol} 
+          <TradingChart
+            key={`chart-${symbol}-${interval}`}
+            symbol={symbol}
             interval={interval}
             smcData={mtfData}
           />
         </div>
-        
+
         <div className="w-96 flex flex-col border-l border-border">
           <div className="h-full overflow-y-auto pb-4">
             <BotControlPanel />
             <VisionAgentPanel />
             <ActivePositionsPanel />
             <AccountPanel />
-            <SMCPanel symbol={symbol} interval={interval} />
+            <SMCPanel
+              key={`panel-${symbol}-${interval}`}
+              symbol={symbol}
+              interval={interval}
+            />
             <TradingLogsPanel />
           </div>
         </div>

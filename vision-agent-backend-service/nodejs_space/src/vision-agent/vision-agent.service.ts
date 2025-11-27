@@ -80,6 +80,7 @@ export class VisionAgentService implements OnApplicationBootstrap {
           ...process.env,
           PYTHONUNBUFFERED: '1',
           PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: 'python',
+          AGENT_MODE: 'LIVE',
         },
       });
 
@@ -189,13 +190,27 @@ export class VisionAgentService implements OnApplicationBootstrap {
     }
   }
 
-  getStatus(): AgentStatus {
+  async getStatus(): Promise<AgentStatus> {
+    let dbCount = 0;
+    try {
+      const client = this.supabaseService.getClient();
+      if (client) {
+        const { count } = await client
+          .from('vision_agent_videos')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'completed');
+        dbCount = count || 0;
+      }
+    } catch (e) {
+      this.logger.warn(`Failed to fetch video count from DB: ${e.message}`);
+    }
+
     return {
       running: this.status.running,
       pid: this.status.pid,
       uptime: this.startTime ? Math.floor((Date.now() - this.startTime) / 1000) : undefined,
       lastHealthCheck: this.status.lastHealthCheck,
-      processedVideos: this.processedVideosCount,
+      processedVideos: Math.max(this.processedVideosCount, dbCount),
       errors: this.errorsCount,
     };
   }

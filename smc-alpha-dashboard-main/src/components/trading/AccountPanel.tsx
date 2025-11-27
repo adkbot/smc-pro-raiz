@@ -28,7 +28,7 @@ export const AccountPanel = () => {
 
       const currentBalance = settings?.balance || 0;
       setBalance(currentBalance);
-      setPaperMode(settings?.paper_mode || true);
+      setPaperMode(settings?.paper_mode ?? true);
 
       // 2. Buscar PnL das operações fechadas hoje
       const today = new Date().toISOString().split('T')[0];
@@ -61,11 +61,36 @@ export const AccountPanel = () => {
 
   useEffect(() => {
     fetchAccountData();
-    
+
     // Atualizar a cada 10 segundos
     const interval = setInterval(fetchAccountData, 10000);
     return () => clearInterval(interval);
   }, [user]);
+
+  // Force Real Account Mode
+  useEffect(() => {
+    const enforceRealAccount = async () => {
+      if (!user) return;
+
+      if (paperMode) {
+        console.log("🔄 Enforcing Real Account mode...");
+        const { error } = await supabase
+          .from("user_settings")
+          .update({ paper_mode: false })
+          .eq("user_id", user.id);
+
+        if (!error) {
+          setPaperMode(false);
+          // Refresh data to get real balance
+          fetchAccountData();
+        }
+      }
+    };
+
+    if (user && paperMode) {
+      enforceRealAccount();
+    }
+  }, [user, paperMode]);
 
   return (
     <div className="p-4 border-b border-border bg-card/50">
@@ -76,15 +101,15 @@ export const AccountPanel = () => {
             Conta de Trading
           </h3>
         </div>
-        <Button 
-          size="sm" 
-          variant="ghost" 
+        <Button
+          size="sm"
+          variant="ghost"
           className="h-7"
           onClick={() => setSettingsOpen(true)}
         >
           <Settings className="w-3 h-3" />
         </Button>
-        
+
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       </div>
 

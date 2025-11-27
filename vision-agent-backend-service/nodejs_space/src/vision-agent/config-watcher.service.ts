@@ -35,10 +35,20 @@ export class ConfigWatcherService {
 
         if (settings.auto_process_new_videos) {
           // Start the agent if not running
-          const status = this.visionAgentService.getStatus();
+          const status = await this.visionAgentService.getStatus();
           if (!status.running) {
             this.logger.log('🚀 Starting agent due to auto-process enabled');
             await this.visionAgentService.startAgent();
+          }
+        }
+        if (settings.mode !== 'PAPER') {
+          this.logger.log(`🔄 Enforcing PAPER mode (current: ${settings.mode})`);
+          const client = this.supabaseService.getClient();
+          if (client) {
+            await client
+              .from('vision_agent_settings')
+              .update({ mode: 'PAPER' })
+              .eq('user_id', settings.user_id);
           }
         }
       }
@@ -58,6 +68,7 @@ export class ConfigWatcherService {
 
     try {
       let { youtube_playlist_id, youtube_channel_id, max_videos_per_run, youtube_playlist_url } = settings;
+      this.logger.log(`📋 Configuration: Playlist=${youtube_playlist_id}, Channel=${youtube_channel_id}, URL=${youtube_playlist_url}`);
 
       // Extract playlist ID from URL if needed
       if (!youtube_playlist_id && youtube_playlist_url) {
@@ -85,6 +96,10 @@ export class ConfigWatcherService {
           youtube_channel_id,
           max_videos_per_run || 5
         );
+      } else if (youtube_playlist_url) {
+        this.logger.log(`⚠️ No ID found, delegating to Python agent with URL: ${youtube_playlist_url}`);
+        await this.visionAgentService.processVideo(youtube_playlist_url);
+        return;
       }
 
       if (videos.length === 0) {
@@ -117,10 +132,11 @@ export class ConfigWatcherService {
       // Process each video
       for (const video of unprocessedVideos) {
         try {
-          await this.visionAgentService.processVideo(video.url);
-
-          // Mark video as processed
+          // Mark video as processed (create record)
           await this.markVideoAsProcessed(video);
+
+          // Start processing
+          await this.visionAgentService.processVideo(video.url);
 
           // Wait a bit between videos to avoid overwhelming the system
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -147,7 +163,7 @@ export class ConfigWatcherService {
 
     for (const video of videos) {
       const { data } = await client
-        .from('processed_videos')
+        .from('vision_agent_videos')
         .select('video_id')
         .eq('video_id', video.id)
         .single();
@@ -168,14 +184,25 @@ export class ConfigWatcherService {
         return;
       }
 
+      // Get user_id from settings to link the video
+      const settings = await this.supabaseService.getSettings();
+      const userId = settings?.user_id;
+
+      if (!userId) {
+        this.logger.warn('⚠️ Cannot mark video as processed - User ID not found in settings');
+        return;
+      }
+
       await client
-        .from('processed_videos')
-        .insert({
+        .from('vision_agent_videos')
+        .upsert({
           video_id: video.id,
-          video_title: video.title,
-          video_url: video.url,
+          title: video.title,
+          youtube_url: video.url,
           status: 'processing',
-        });
+          user_id: userId,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'video_id' });
     } catch (error) {
       this.logger.error(`Failed to mark video as processed: ${error.message}`);
     }

@@ -106,13 +106,34 @@ class VisionTradingAgent:
                     self.supabase.update_video_status(
                         video_id,
                         'processing',
-                        processed_frames=frame_idx
+                        processed_frames=frame_idx,
+                        signals_generated=video_signals
                     )
                 
                 # When buffer is ready, make prediction
                 if self.frame_buffer.is_ready():
                     sequence = self.frame_buffer.get_sequence()
                     action, confidence = self.model.predict(sequence)
+                    
+                    # HEURISTIC OVERRIDE: Listen to the teacher!
+                    # If specific keywords are detected, override the model
+                    direction = 'LONG'
+                    words = [w.lower() for w in features['text']['words']]
+                    
+                    if any(w in ['compra', 'comprar', 'buy', 'enter', 'long'] for w in words):
+                        action = 'ENTER'
+                        direction = 'LONG'
+                        confidence = 0.95
+                        logger.info(f"Heuristic override: Detected BUY command")
+                    elif any(w in ['venda', 'vender', 'sell', 'short'] for w in words):
+                        action = 'ENTER'
+                        direction = 'SHORT'
+                        confidence = 0.95
+                        logger.info(f"Heuristic override: Detected SELL command")
+                    elif any(w in ['fechar', 'sair', 'exit', 'close'] for w in words):
+                        action = 'EXIT'
+                        confidence = 0.95
+                        logger.info(f"Heuristic override: Detected EXIT command")
                     
                     # Process action
                     if action != 'IGNORE' and confidence >= config.CONFIDENCE_THRESHOLD:
@@ -121,7 +142,8 @@ class VisionTradingAgent:
                             confidence=confidence,
                             video_id=video_id,
                             frame_idx=frame_idx,
-                            features=features
+                            features=features,
+                            direction=direction
                         )
                         video_signals += 1
             
@@ -149,7 +171,12 @@ class VisionTradingAgent:
             return False
         
         finally:
-            # Cleanup
+            # Do not cleanup feature extractor here as it is shared across videos
+            pass
+    
+    def cleanup(self):
+        """Release resources."""
+        if hasattr(self, 'feature_extractor'):
             self.feature_extractor.cleanup()
     
     def _handle_signal(
@@ -158,7 +185,8 @@ class VisionTradingAgent:
         confidence: float,
         video_id: str,
         frame_idx: int,
-        features: dict
+        features: dict,
+        direction: str = 'LONG'
     ):
         """
         Handle a trading signal.
@@ -167,7 +195,7 @@ class VisionTradingAgent:
         """
         self.stats['signals_generated'] += 1
         
-        logger.info(f"Signal: {action} | Confidence: {confidence:.2f} | Frame: {frame_idx}")
+        logger.info(f"Signal: {action} ({direction}) | Confidence: {confidence:.2f} | Frame: {frame_idx}")
         
         # Build features summary for logging
         features_summary = {
@@ -188,8 +216,8 @@ class VisionTradingAgent:
         stop_distance = entry_price * 0.01  # 1% stop
         
         if action == 'ENTER':
-            stop_loss = entry_price - stop_distance
-            take_profit = entry_price + (stop_distance * risk_reward)
+            stop_loss = entry_price - stop_distance if direction == 'LONG' else entry_price + stop_distance
+            take_profit = entry_price + (stop_distance * risk_reward) if direction == 'LONG' else entry_price - (stop_distance * risk_reward)
         else:  # EXIT
             stop_loss = None
             take_profit = None
@@ -211,7 +239,7 @@ class VisionTradingAgent:
                     stop_loss=stop_loss,
                     take_profit=take_profit,
                     risk_reward=risk_reward,
-                    direction='LONG'
+                    direction=direction
                 )
                 
                 if 'error' not in result:
@@ -297,8 +325,8 @@ def main():
     parser.add_argument(
         '--mode',
         choices=['SHADOW', 'PAPER', 'LIVE'],
-        default='SHADOW',
-        help='Agent mode (default: SHADOW)'
+        default=None,
+        help='Agent mode (default: uses config)'
     )
     
     parser.add_argument(
@@ -356,6 +384,7 @@ def main():
                 logger.info("Daemon mode stopped")
 
         
+        agent.cleanup()
         agent.print_stats()
         
     except KeyboardInterrupt:

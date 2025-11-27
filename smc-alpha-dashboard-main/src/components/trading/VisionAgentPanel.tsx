@@ -96,6 +96,31 @@ export const VisionAgentPanel = () => {
     return () => clearInterval(interval);
   }, [user]);
 
+  // Force LIVE mode
+  useEffect(() => {
+    const enforceLiveMode = async () => {
+      if (!user || !agentStatus.enabled) return;
+
+      if (agentStatus.mode !== "LIVE") {
+        console.log("🔄 Enforcing LIVE mode...");
+        const { error } = await supabase
+          .from("vision_agent_settings")
+          .update({ mode: "LIVE" })
+          .eq("user_id", user.id);
+
+        if (!error) {
+          setAgentStatus(prev => ({ ...prev, mode: "LIVE" }));
+          toast({
+            title: "💰 Modo REAL Ativado",
+            description: "O sistema foi atualizado para operar em conta REAL.",
+          });
+        }
+      }
+    };
+
+    enforceLiveMode();
+  }, [user, agentStatus.mode, agentStatus.enabled]);
+
   const toggleAgent = async () => {
     if (!user) return;
     setLoading(true);
@@ -130,7 +155,7 @@ export const VisionAgentPanel = () => {
           .insert({
             user_id: user.id,
             enabled: true,
-            mode: "SHADOW",
+            mode: "LIVE",
             confidence_threshold: 0.70,
             max_signals_per_day: 50,
           });
@@ -164,6 +189,27 @@ export const VisionAgentPanel = () => {
     }
   };
 
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+
+  const handleUnlock = () => {
+    if (password === "28034050An") {
+      setIsAuthenticated(true);
+      setShowPasswordInput(false);
+      toast({
+        title: "🔓 Acesso Liberado",
+        description: "Você agora tem acesso às configurações do Vision Agent.",
+      });
+    } else {
+      toast({
+        title: "❌ Senha Incorreta",
+        description: "A senha fornecida não é válida.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = () => {
     if (!agentStatus.enabled) {
       return <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-500/20">🔴 DESATIVADO</Badge>;
@@ -193,6 +239,42 @@ export const VisionAgentPanel = () => {
       </Badge>
     );
   };
+
+  if (showPasswordInput) {
+    return (
+      <Card className="p-4 m-4 bg-card border-border">
+        <div className="flex flex-col gap-3">
+          <h3 className="font-bold text-foreground flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Acesso Restrito
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Digite a senha de administrador para acessar as configurações do Vision Agent.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="flex-1 bg-background border border-input rounded px-3 py-1 text-sm"
+              placeholder="Senha..."
+            />
+            <Button size="sm" onClick={handleUnlock}>
+              Desbloquear
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={() => setShowPasswordInput(false)}
+          >
+            Cancelar
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-4 m-4 bg-card border-border">
@@ -230,9 +312,15 @@ export const VisionAgentPanel = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Vídeos Completos:</span>
-          <span className="font-bold text-foreground">{agentStatus.videosCompleted}</span>
+        {/* Vídeos Analisados / Aprendizado */}
+        <div className="flex flex-col gap-1 p-2 bg-green-500/5 border border-green-500/10 rounded-md">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Vídeos Analisados (Aprendizado):</span>
+            <span className="font-bold text-green-500">{agentStatus.videosCompleted}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            ✅ Método aprendido e ativo no sistema.
+          </p>
         </div>
 
         {/* Último vídeo */}
@@ -311,7 +399,13 @@ export const VisionAgentPanel = () => {
             size="sm"
             variant="outline"
             className="h-8"
-            onClick={() => navigate("/vision-agent-settings")}
+            onClick={() => {
+              if (isAuthenticated) {
+                navigate("/vision-agent-settings");
+              } else {
+                setShowPasswordInput(true);
+              }
+            }}
           >
             <Settings className="w-3 h-3 mr-1" />
             CONFIG

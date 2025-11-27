@@ -217,9 +217,7 @@ export class SupabaseService implements OnApplicationBootstrap {
     }
   }
 
-  getClient(): SupabaseClient | null {
-    return this.supabase;
-  }
+
 
   async getSettings() {
     if (!this.supabase) {

@@ -14,10 +14,10 @@ class VisionAgentConfig:
     SUPABASE_USER_ID: str = os.getenv("SUPABASE_USER_ID", "")
     
     # Agent Mode
-    MODE: str = os.getenv("AGENT_MODE", "SHADOW")  # SHADOW, PAPER, LIVE
+    MODE: str = os.getenv("AGENT_MODE", "LIVE")  # SHADOW, PAPER, LIVE
     
     # Video Processing
-    FRAME_STEP: int = int(os.getenv("FRAME_STEP", "5"))  # Process every N frames
+    FRAME_STEP: int = int(os.getenv("FRAME_STEP", "30"))  # Process every N frames
     MIN_VIDEO_DURATION: int = int(os.getenv("MIN_VIDEO_DURATION", "60"))  # seconds
     MAX_VIDEO_DURATION: int = int(os.getenv("MAX_VIDEO_DURATION", "3600"))  # seconds
     

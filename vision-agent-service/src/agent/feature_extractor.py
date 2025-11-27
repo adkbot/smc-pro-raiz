@@ -280,8 +280,8 @@ class FeatureExtractor:
             float(features['text']['text_detected']),
             len(features['text']['words']) / 10.0,
             len(features['text']['numbers']) / 5.0,
-            float(any('enter' in w.lower() or 'buy' in w.lower() for w in features['text']['words'])),
-            float(any('exit' in w.lower() or 'sell' in w.lower() for w in features['text']['words']))
+            float(any(w.lower() in ['enter', 'buy', 'compra', 'comprar', 'entrar'] for w in features['text']['words'])),
+            float(any(w.lower() in ['exit', 'sell', 'venda', 'vender', 'sair', 'fechar'] for w in features['text']['words']))
         ])
         
         # Arrows features (3 values)

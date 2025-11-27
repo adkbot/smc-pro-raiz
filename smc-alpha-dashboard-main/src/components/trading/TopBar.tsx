@@ -32,10 +32,10 @@ export const TopBar = ({ symbol, interval, onSymbolChange, onIntervalChange }: T
     const timer = setInterval(() => {
       setTime(new Date().toLocaleTimeString());
     }, 1000);
-    
+
     // Simulate connection
     setTimeout(() => setIsConnected(true), 1000);
-    
+
     return () => clearInterval(timer);
   }, []);
 
@@ -61,9 +61,9 @@ export const TopBar = ({ symbol, interval, onSymbolChange, onIntervalChange }: T
             </span>
           </h1>
         </div>
-        
+
         <div className="h-6 w-px bg-border"></div>
-        
+
         <Select value={symbol} onValueChange={onSymbolChange}>
           <SelectTrigger className="w-[140px] h-8 text-sm bg-secondary border-border">
             <SelectValue />
@@ -74,9 +74,20 @@ export const TopBar = ({ symbol, interval, onSymbolChange, onIntervalChange }: T
             <SelectItem value="SOLUSDT">SOL/USDT</SelectItem>
             <SelectItem value="XRPUSDT">XRP/USDT</SelectItem>
             <SelectItem value="BNBUSDT">BNB/USDT</SelectItem>
+            <SelectItem value="ADAUSDT">ADA/USDT</SelectItem>
+            <SelectItem value="DOGEUSDT">DOGE/USDT</SelectItem>
+            <SelectItem value="DOTUSDT">DOT/USDT</SelectItem>
+            <SelectItem value="MATICUSDT">MATIC/USDT</SelectItem>
+            <SelectItem value="LTCUSDT">LTC/USDT</SelectItem>
+            <SelectItem value="LINKUSDT">LINK/USDT</SelectItem>
+            <SelectItem value="AVAXUSDT">AVAX/USDT</SelectItem>
+            <SelectItem value="UNIUSDT">UNI/USDT</SelectItem>
+            <SelectItem value="ATOMUSDT">ATOM/USDT</SelectItem>
+            <SelectItem value="EURUSDT">EUR/USDT</SelectItem>
+            <SelectItem value="GBPUSDT">GBP/USDT</SelectItem>
           </SelectContent>
         </Select>
-        
+
         <Select value={interval} onValueChange={onIntervalChange}>
           <SelectTrigger className="w-[120px] h-8 text-sm bg-secondary border-border">
             <SelectValue />
@@ -90,45 +101,45 @@ export const TopBar = ({ symbol, interval, onSymbolChange, onIntervalChange }: T
             <SelectItem value="1d">1 Dia</SelectItem>
           </SelectContent>
         </Select>
-        
+
         <Button size="sm" variant="outline" className="h-8">
           <RefreshCw className="w-4 h-4 mr-2" />
           Recarregar
         </Button>
       </div>
-      
+
       <div className="flex items-center gap-4 text-sm">
-        <Button 
-          size="sm" 
-          variant="ghost" 
+        <Button
+          size="sm"
+          variant="ghost"
           className="h-8"
           onClick={() => setSettingsOpen(true)}
         >
           <Settings className="w-4 h-4 mr-2" />
           Configurações
         </Button>
-        
-        <Button 
-          size="sm" 
-          variant="ghost" 
+
+        <Button
+          size="sm"
+          variant="ghost"
           className="h-8"
           onClick={handleLogout}
         >
           <LogOut className="w-4 h-4 mr-2" />
           Sair
         </Button>
-        
+
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-        
+
         <div className="h-6 w-px bg-border"></div>
-        
+
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-destructive'}`}></div>
           <span className="text-muted-foreground text-xs">
             {isConnected ? 'Conectado' : 'Desconectado'}
           </span>
         </div>
-        
+
         <span className="font-mono text-foreground">{time}</span>
       </div>
     </header>

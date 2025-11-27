@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { fetchBinanceCandles, analyzeStructure, Candle, StructureResult } from "@/utils/smc";
 
 interface BOSCHOCHData {
   trend: "ALTA" | "BAIXA" | "NEUTRO";
@@ -107,7 +108,7 @@ export interface MTFAnalysis {
 const DEFAULT_TIMEFRAMES = ["1d", "4h", "1h", "30m", "15m", "5m", "1m"];
 
 export const useMultiTimeframeAnalysis = (
-  symbol: string, 
+  symbol: string,
   currentTimeframe: string,
   timeframes: string[] = DEFAULT_TIMEFRAMES
 ) => {
@@ -120,20 +121,85 @@ export const useMultiTimeframeAnalysis = (
       setLoading(true);
       setError(null);
 
-      const { data: result, error: funcError } = await supabase.functions.invoke(
-        "analyze-multi-timeframe",
-        {
-          body: { 
-            symbol, 
-            timeframes,
-            currentTimeframe 
-          },
-        }
-      );
+      // 1. Fetch candles for all timeframes in parallel
+      const candlesPromises = timeframes.map(tf => fetchBinanceCandles(symbol, tf, 100));
+      const candlesResults = await Promise.all(candlesPromises);
 
-      if (funcError) {
-        throw funcError;
-      }
+      const tfMap: Record<string, Candle[]> = {};
+      timeframes.forEach((tf, i) => {
+        tfMap[tf] = candlesResults[i];
+      });
+
+      // 2. Analyze structure for each timeframe
+      const analysisMap: Record<string, StructureResult> = {};
+      timeframes.forEach(tf => {
+        analysisMap[tf] = analyzeStructure(tfMap[tf]);
+      });
+
+      // 3. Build the MTFAnalysis object
+      const currentTFAnalysis = analysisMap[currentTimeframe];
+      const currentCandles = tfMap[currentTimeframe];
+      const currentPrice = currentCandles[currentCandles.length - 1].close;
+
+      // Calculate Premium/Discount (using last 50 candles range)
+      const recentCandles = currentCandles.slice(-50);
+      const rangeHigh = Math.max(...recentCandles.map(c => c.high));
+      const rangeLow = Math.min(...recentCandles.map(c => c.low));
+      const rangeSize = rangeHigh - rangeLow;
+      const rangePercentage = rangeSize > 0 ? ((currentPrice - rangeLow) / rangeSize) * 100 : 50;
+
+      let pdStatus: "PREMIUM" | "EQUILIBRIUM" | "DISCOUNT" = "EQUILIBRIUM";
+      if (rangePercentage > 60) pdStatus = "PREMIUM";
+      else if (rangePercentage < 40) pdStatus = "DISCOUNT";
+
+      const result: MTFAnalysis = {
+        symbol,
+        timestamp: new Date().toISOString(),
+        higherTimeframes: {
+          "1d": { ...analysisMap["1d"], confidence: 80, bosCount: 0, chochCount: 0 },
+          "4h": { ...analysisMap["4h"], confidence: 80, bosCount: 0, chochCount: 0 },
+          "1h": { ...analysisMap["1h"], confidence: 80, bosCount: 0, chochCount: 0 },
+        },
+        dominantBias: {
+          bias: analysisMap["4h"].trend, // Using 4h as dominant
+          strength: "FORTE",
+          reasoning: `Tendência de ${analysisMap["4h"].trend} no 4H confirmada por estrutura.`
+        },
+        currentTimeframe: {
+          timeframe: currentTimeframe,
+          ...currentTFAnalysis,
+          confidence: 85,
+          bosCount: 0,
+          chochCount: 0,
+          interpretation: `Estrutura de ${currentTFAnalysis.trend} identificada.`,
+          alignedWithHigherTF: currentTFAnalysis.trend === analysisMap["4h"].trend,
+          tradingOpportunity: (currentTFAnalysis.trend === "ALTA" && pdStatus === "DISCOUNT") || (currentTFAnalysis.trend === "BAIXA" && pdStatus === "PREMIUM"),
+          reasoning: currentTFAnalysis.trend === "ALTA" && pdStatus === "DISCOUNT"
+            ? "Tendência de ALTA em zona de DESCONTO (Oportunidade de Compra)"
+            : currentTFAnalysis.trend === "BAIXA" && pdStatus === "PREMIUM"
+              ? "Tendência de BAIXA em zona PREMIUM (Oportunidade de Venda)"
+              : "Aguardando melhor ponto de entrada...",
+          premiumDiscount: {
+            currentPrice,
+            rangeHigh,
+            rangeLow,
+            rangePercentage,
+            status: pdStatus,
+            statusDescription: pdStatus
+          },
+          fvgs: [], // TODO: Implement FVG detection
+          orderBlocks: [], // TODO: Implement OB detection
+          manipulationZones: [],
+          pois: [] // TODO: Implement POI detection
+        },
+        allTimeframes: timeframes.map(tf => ({
+          timeframe: tf,
+          ...analysisMap[tf],
+          confidence: 80,
+          bosCount: 0,
+          chochCount: 0
+        }))
+      };
 
       setData(result);
     } catch (err: any) {
@@ -171,15 +237,15 @@ export const useMultiTimeframeAnalysis = (
         if (settings?.bot_status === "running") {
           const direction = data.currentTimeframe.trend === "ALTA" ? "LONG" : "SHORT";
           const currentPrice = data.currentTimeframe.premiumDiscount.currentPrice;
-          
+
           // Calcular SL e TP básicos (pode ser ajustado)
           const slDistance = currentPrice * 0.01; // 1% de distância
           const rr = 2.0;
-          
-          const stopLoss = direction === "LONG" 
-            ? currentPrice - slDistance 
+
+          const stopLoss = direction === "LONG"
+            ? currentPrice - slDistance
             : currentPrice + slDistance;
-          
+
           const takeProfit = direction === "LONG"
             ? currentPrice + (slDistance * rr)
             : currentPrice - (slDistance * rr);

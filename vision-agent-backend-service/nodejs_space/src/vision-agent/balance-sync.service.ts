@@ -16,30 +16,48 @@ export class BalanceSyncService {
         if (!supabase) return;
 
         try {
-            // Fetch users with paper_mode = false and api keys configured
-            const { data: users, error } = await supabase
+            // 1. Fetch users who are NOT in paper mode
+            const { data: settings, error: settingsError } = await supabase
                 .from('user_settings')
-                .select('user_id, api_key, api_secret, paper_mode')
-                .eq('paper_mode', false)
-                .not('api_key', 'is', null)
-                .not('api_secret', 'is', null);
+                .select('user_id')
+                .eq('paper_mode', false);
 
-            if (error) {
-                this.logger.error(`Error fetching user settings: ${error.message}`);
+            if (settingsError) {
+                this.logger.error(`Error fetching user settings: ${settingsError.message}`);
                 return;
             }
 
-            if (!users || users.length === 0) return;
+            if (!settings || settings.length === 0) return;
 
-            for (const user of users) {
-                await this.syncUserBalance(user);
+            const userIds = settings.map(s => s.user_id);
+
+            // 2. Fetch credentials for these users (Binance only for now)
+            const { data: credentials, error: credsError } = await supabase
+                .from('user_api_credentials')
+                .select('user_id, encrypted_api_key, encrypted_api_secret')
+                .eq('broker_type', 'binance')
+                .in('user_id', userIds);
+
+            if (credsError) {
+                this.logger.error(`Error fetching credentials: ${credsError.message}`);
+                return;
+            }
+
+            if (!credentials || credentials.length === 0) return;
+
+            for (const cred of credentials) {
+                await this.syncUserBalance({
+                    user_id: cred.user_id,
+                    api_key: cred.encrypted_api_key,
+                    api_secret: cred.encrypted_api_secret
+                });
             }
         } catch (error) {
             this.logger.error(`Error in syncBalances: ${error.message}`);
         }
     }
 
-    private async syncUserBalance(user: any) {
+    private async syncUserBalance(user: { user_id: string, api_key: string, api_secret: string }) {
         try {
             // @ts-ignore
             const exchange = new ccxt.binance({
@@ -71,7 +89,6 @@ export class BalanceSyncService {
                 totalUsdt += futuresBalance.total['USDT'] || 0;
             } catch (e) {
                 // Ignore error if futures are not enabled or permission denied
-                // this.logger.warn(`Failed to fetch Futures balance for user ${user.user_id}: ${e.message}`);
             }
 
             const supabase = this.supabaseService.getClient();

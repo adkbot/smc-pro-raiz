@@ -220,6 +220,7 @@ export const useMultiTimeframeAnalysis = (
   }, [symbol, currentTimeframe, JSON.stringify(timeframes)]);
 
   // Auto-executar sinais se bot estiver rodando
+  /*
   useEffect(() => {
     const checkAndExecuteSignals = async () => {
       if (!data?.currentTimeframe?.tradingOpportunity) return;
@@ -278,6 +279,7 @@ export const useMultiTimeframeAnalysis = (
 
     checkAndExecuteSignals();
   }, [data?.currentTimeframe?.tradingOpportunity, symbol]);
+  */
 
   return { data, loading, error, refresh: fetchAnalysis };
 };

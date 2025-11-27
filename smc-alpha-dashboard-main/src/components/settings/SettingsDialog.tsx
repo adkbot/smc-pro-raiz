@@ -28,6 +28,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const [riskPerTrade, setRiskPerTrade] = useState("0.06");
   const [maxPositions, setMaxPositions] = useState("3");
   const [paperMode, setPaperMode] = useState(true);
+  const [autoTrading, setAutoTrading] = useState(false);
 
   // Binance API
   const [binanceKey, setBinanceKey] = useState("");
@@ -63,6 +64,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
         setRiskPerTrade(settings.risk_per_trade?.toString() || "0.06");
         setMaxPositions(settings.max_positions?.toString() || "3");
         setPaperMode(settings.paper_mode ?? true);
+        setAutoTrading(settings.auto_trading_enabled ?? false);
       }
 
       const { data: credentials } = await supabase
@@ -99,6 +101,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
           risk_per_trade: parseFloat(riskPerTrade),
           max_positions: parseInt(maxPositions),
           paper_mode: paperMode,
+          auto_trading_enabled: autoTrading,
         })
         .eq("user_id", user.id);
 
@@ -353,6 +356,15 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                 id="paper"
                 checked={paperMode}
                 onCheckedChange={setPaperMode}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="autotrading">Auto Trading (Executar Sinais)</Label>
+              <Switch
+                id="autotrading"
+                checked={autoTrading}
+                onCheckedChange={setAutoTrading}
               />
             </div>
 

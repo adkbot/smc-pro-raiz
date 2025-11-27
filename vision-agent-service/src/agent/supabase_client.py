@@ -81,6 +81,12 @@ class SupabaseClient:
         if risk_reward is not None:
             payload['risk_reward'] = risk_reward
         
+        # Send to Backend (Trade Executor)
+        try:
+            self._send_to_backend(payload)
+        except Exception as e:
+            logger.error(f"Failed to send signal to backend: {e}")
+
         url = f"{self.base_url}/functions/v1/vision-agent-signal"
         
         try:
@@ -99,6 +105,19 @@ class SupabaseClient:
             if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response: {e.response.text}")
             return {'error': str(e)}
+    
+    def _send_to_backend(self, payload: Dict):
+        """Send signal directly to NestJS backend."""
+        url = f"{config.BACKEND_URL}/trade-executor/signal"
+        try:
+            logger.info(f"Sending signal to Backend: {url}")
+            response = requests.post(url, json=payload, timeout=5)
+            if response.status_code >= 200 and response.status_code < 300:
+                logger.info("Backend accepted signal")
+            else:
+                logger.error(f"Backend rejected signal: {response.status_code} {response.text}")
+        except Exception as e:
+            logger.error(f"Error communicating with backend: {e}")
     
     def update_video_status(
         self,

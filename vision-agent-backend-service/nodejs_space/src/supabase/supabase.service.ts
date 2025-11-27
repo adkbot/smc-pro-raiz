@@ -115,6 +115,26 @@ export class SupabaseService implements OnApplicationBootstrap {
         ADD COLUMN IF NOT EXISTS trading_platform TEXT DEFAULT 'BINANCE';
       `);
 
+      // Add auto_trading_enabled to user_settings if it doesn't exist
+      await this.executeSqlDirect(`
+        CREATE TABLE IF NOT EXISTS user_settings (
+          user_id UUID PRIMARY KEY,
+          balance NUMERIC DEFAULT 10000,
+          leverage INTEGER DEFAULT 20,
+          risk_per_trade NUMERIC DEFAULT 0.06,
+          max_positions INTEGER DEFAULT 3,
+          paper_mode BOOLEAN DEFAULT true,
+          auto_trading_enabled BOOLEAN DEFAULT false,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `);
+
+      await this.executeSqlDirect(`
+        ALTER TABLE user_settings 
+        ADD COLUMN IF NOT EXISTS auto_trading_enabled BOOLEAN DEFAULT false;
+      `);
+
       // Create processed_videos table if not exists
       await this.executeSqlDirect(`
         CREATE TABLE IF NOT EXISTS processed_videos (

@@ -7,6 +7,8 @@ import { SupabaseModule } from './supabase/supabase.module';
 import { VisionAgentModule } from './vision-agent/vision-agent.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 
+import { TradeExecutorModule } from './trade-executor/trade-executor.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -17,8 +19,9 @@ import { MonitoringModule } from './monitoring/monitoring.module';
     SupabaseModule,
     VisionAgentModule,
     MonitoringModule,
+    TradeExecutorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

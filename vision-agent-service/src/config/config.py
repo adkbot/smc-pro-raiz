@@ -60,6 +60,9 @@ class VisionAgentConfig:
     
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
+    # Backend Integration
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:3000")
     
     def validate(self) -> bool:
         """Validate configuration."""

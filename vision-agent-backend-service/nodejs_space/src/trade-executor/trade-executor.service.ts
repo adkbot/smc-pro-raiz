@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+// @ts-ignore
 import * as ccxt from 'ccxt';
 
 @Injectable()
@@ -51,6 +52,9 @@ export class TradeExecutorService {
 
     private async executeForUser(user: any, signal: any) {
         const supabase = this.supabaseService.getClient();
+        if (!supabase) {
+            return { user_id: user.user_id, status: 'error', message: 'Supabase client unavailable' };
+        }
 
         try {
             // Get API Credentials

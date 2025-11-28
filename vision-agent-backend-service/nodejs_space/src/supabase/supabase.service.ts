@@ -47,12 +47,28 @@ export class SupabaseService implements OnApplicationBootstrap {
       return;
     }
 
+    // Run initialization in background to not block server startup
+    this.initializeSupabase().catch(err => {
+      this.logger.error('❌ Background Supabase initialization failed', err);
+    });
+  }
+
+  private async initializeSupabase() {
     this.logger.log('🚀 Starting Supabase automatic configuration...');
 
     try {
-      await this.applyMigrations();
-      await this.deployEdgeFunction();
-      await this.seedInitialData();
+      // Add a timeout race to prevent hanging indefinitely
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Initialization timed out')), 30000));
+
+      await Promise.race([
+        (async () => {
+          await this.applyMigrations();
+          await this.deployEdgeFunction();
+          await this.seedInitialData();
+        })(),
+        timeout
+      ]);
+
       this.logger.log('✅ Supabase configuration completed successfully!');
     } catch (error) {
       this.logger.error('❌ Failed to configure Supabase automatically', error);

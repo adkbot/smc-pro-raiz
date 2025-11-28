@@ -8,15 +8,12 @@ import * as path from 'path';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
+    logger: ['log', 'error', 'warn'],
   });
+  app.enableCors(); // Enable CORS for all origins (dev mode)
+  app.setGlobalPrefix('api'); // Set global prefix for all routes
 
   // Enable CORS for frontend at localhost:8080
-  app.enableCors({
-    origin: ['http://localhost:8080', 'http://localhost:3000'],
-    credentials: true,
-  });
-
   // Swagger configuration with custom styling
   const config = new DocumentBuilder()
     .setTitle('Vision Trading Agent API')
@@ -27,7 +24,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  
+
   // Custom CSS for professional, production-grade documentation
   const customCss = `
     .swagger-ui .topbar { display: none; }
@@ -104,7 +101,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  
+
   logger.log(`🚀 Vision Trading Agent Backend Service started on port ${port}`);
   logger.log(`📚 API Documentation available at http://localhost:${port}/api-docs`);
   logger.log(`🤖 Python Vision Agent will be managed automatically`);

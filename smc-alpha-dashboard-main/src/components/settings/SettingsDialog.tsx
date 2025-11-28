@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,8 +76,18 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
         credentials.forEach((cred) => {
           if (cred.broker_type === "binance") {
             setBinanceStatus(cred.test_status as any || "pending");
-            if (cred.encrypted_api_key) setBinanceKey(cred.encrypted_api_key);
-            if (cred.encrypted_api_secret) setBinanceSecret(cred.encrypted_api_secret);
+            setBinanceStatus(cred.test_status as any || "pending");
+            // Only set keys if they are NOT masked/encrypted (legacy check)
+            // Ideally backend should return masked version or nothing.
+            // For now, we leave empty to force user to re-enter if they want to edit.
+            // Or we could show a placeholder.
+            if (cred.encrypted_api_key && !cred.encrypted_api_key.startsWith('eyJh')) {
+              // If it looks like a real key (64 chars), show it? 
+              // Security risk to show full key. Better to show empty or placeholder.
+              // User asked: "trocar máscara por string vazia ao abrir"
+              setBinanceKey("");
+            }
+            if (cred.encrypted_api_secret) setBinanceSecret("");
           } else if (cred.broker_type === "forex") {
             setForexStatus(cred.test_status as any || "pending");
             if (cred.broker_name) setForexBroker(cred.broker_name);
@@ -152,15 +162,43 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       const trimmedKey = binanceKey.trim();
       const trimmedSecret = binanceSecret.trim();
 
+      // If keys are empty, just delete the credentials (disconnect)
+      if (!trimmedKey && !trimmedSecret) {
+        await supabase
+          .from("user_api_credentials")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("broker_type", "binance");
+
+        setBinanceStatus("pending");
+        toast({
+          title: "Credenciais Removidas",
+          description: "Suas chaves da Binance foram removidas com sucesso.",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!trimmedKey || !trimmedSecret) {
+        throw new Error("Para conectar, você precisa preencher ambos os campos (Key e Secret). Para remover, limpe ambos.");
+      }
+
+      // Force delete existing credentials first to ensure clean state
+      await supabase
+        .from("user_api_credentials")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("broker_type", "binance");
+
       const { error: directError } = await supabase
         .from("user_api_credentials")
-        .upsert({
+        .insert({
           user_id: user.id,
           broker_type: "binance",
           encrypted_api_key: trimmedKey, // Storing plain text
           encrypted_api_secret: trimmedSecret,
           test_status: "pending"
-        }, { onConflict: "user_id, broker_type" });
+        });
 
       if (directError) throw directError;
 
@@ -202,25 +240,91 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
     }
   };
 
+  const resetBinanceCredentials = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Call backend to delete keys
+      const response = await fetch('http://localhost:3000/api/binance/keys', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to reset credentials');
+      }
+
+      setBinanceKey("");
+      setBinanceSecret("");
+      setBinanceStatus("pending");
+
+      toast({
+        title: "Credenciais Resetadas",
+        description: "Suas credenciais da Binance foram removidas com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao resetar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const testBinanceConnection = async () => {
     setTestingBinance(true);
     try {
-      const { data, error } = await supabase.functions.invoke("test-broker-connection", {
-        body: { broker_type: "binance" },
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Validate inputs before sending
+      const trimmedKey = binanceKey.trim();
+      const trimmedSecret = binanceSecret.trim();
+
+      if (!trimmedKey || !trimmedSecret) {
+        throw new Error("Preencha API Key e Secret para testar.");
+      }
+
+      if (trimmedKey.includes('••••') || trimmedSecret.includes('••••')) {
+        throw new Error("Não é possível testar com valores mascarados. Digite as chaves reais.");
+      }
+
+      // Call backend to test connection
+      const response = await fetch('http://localhost:3000/api/binance/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: trimmedKey,
+          apiSecret: trimmedSecret,
+          userId: user.id
+        }),
       });
 
-      if (error) throw error;
+      const data = await response.json();
 
-      setBinanceStatus(data.status);
+      if (!response.ok) {
+        throw new Error(data.message || 'Falha na conexão');
+      }
+
+      setBinanceStatus("success");
       toast({
-        title: data.status === "success" ? "Conexão bem-sucedida" : "Falha na conexão",
-        description: data.message,
-        variant: data.status === "success" ? "default" : "destructive",
+        title: "Conexão bem-sucedida",
+        description: "Credenciais válidas e conexão estabelecida!",
       });
     } catch (error: any) {
       setBinanceStatus("failed");
       toast({
-        title: "Erro",
+        title: "Erro na Conexão",
         description: error.message,
         variant: "destructive",
       });
@@ -329,6 +433,9 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Configurações</DialogTitle>
+          <DialogDescription>
+            Gerencie suas configurações de conta, APIs e preferências.
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="account" className="w-full">
@@ -433,14 +540,17 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
               />
             </div>
 
-            <div className="flex gap-2">
-              <Button onClick={saveBinanceKeys} disabled={loading || !binanceKey || !binanceSecret} className="flex-1">
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={saveBinanceKeys} disabled={loading} className="flex-1">
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar
               </Button>
               <Button onClick={testBinanceConnection} disabled={testingBinance} variant="outline">
                 {testingBinance && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Testar Conexão
+              </Button>
+              <Button onClick={resetBinanceCredentials} disabled={loading} variant="destructive">
+                Resetar Credenciais
               </Button>
             </div>
           </TabsContent>

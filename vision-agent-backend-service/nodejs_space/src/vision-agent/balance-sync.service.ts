@@ -80,6 +80,15 @@ export class BalanceSyncService {
             const apiSecret = user.api_secret.trim();
 
             // Debug log to check key validity (without exposing the full key)
+            if (apiKey.startsWith('eyJh') || apiKey.startsWith('ZXlKa')) {
+                this.logger.error(`❌ User ${user.user_id} has a LEGACY ENCRYPTED API KEY (starts with 'eyJh' or 'ZXlKa'). Please re-save your API Key in the Settings Dashboard.`);
+                return;
+            }
+
+            if (apiKey.length !== 64) {
+                this.logger.warn(`⚠️ User ${user.user_id} API Key length is ${apiKey.length} (Expected 64). This might be incorrect.`);
+            }
+
             if (apiKey.length > 5 && apiSecret.length > 5) {
                 this.logger.debug(`User ${user.user_id} Key Start: ${apiKey.substring(0, 5)}..., Secret Start: ${apiSecret.substring(0, 5)}...`);
             } else {

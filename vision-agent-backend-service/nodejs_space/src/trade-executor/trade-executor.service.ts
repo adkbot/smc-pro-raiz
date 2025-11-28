@@ -71,8 +71,13 @@ export class TradeExecutorService {
             }
 
             // Decrypt keys (Fallback to plain text if encryption failed previously)
-            const apiKey = creds.encrypted_api_key;
-            const apiSecret = creds.encrypted_api_secret;
+            const apiKey = creds.encrypted_api_key ? creds.encrypted_api_key.trim() : '';
+            const apiSecret = creds.encrypted_api_secret ? creds.encrypted_api_secret.trim() : '';
+
+            if (apiKey.startsWith('eyJh') || apiKey.startsWith('ZXlKa')) {
+                this.logger.error(`❌ User ${user.user_id} has a LEGACY ENCRYPTED API KEY. Trade aborted.`);
+                return { user_id: user.user_id, status: 'failed', error: 'Legacy Encrypted API Key' };
+            }
 
             const symbol = signal.asset; // e.g. 'BTCUSDT'
 

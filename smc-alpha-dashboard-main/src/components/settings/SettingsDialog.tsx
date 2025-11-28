@@ -128,6 +128,9 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // TEMPORARY FIX: Saving keys directly (unencrypted) because backend cannot decrypt Edge Function keys yet.
+      // The Edge Function call is disabled to ensure backend can read the keys.
+      /*
       const { data, error } = await supabase.functions.invoke("encrypt-api-credentials", {
         body: {
           broker_type: "binance",
@@ -138,24 +141,26 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
       if (error) {
         console.error("Edge function failed, trying direct insert", error);
-        // Fallback: Direct insert (WARNING: Not encrypted)
-        const { error: directError } = await supabase
-          .from("user_api_credentials")
-          .upsert({
-            user_id: user.id,
-            broker_type: "binance",
-            encrypted_api_key: binanceKey, // Storing plain text as fallback
-            encrypted_api_secret: binanceSecret,
-            test_status: "pending"
-          }, { onConflict: "user_id, broker_type" });
-
-        if (directError) throw directError;
       }
+      */
+
+      // Direct insert (Unencrypted for now)
+      const { error: directError } = await supabase
+        .from("user_api_credentials")
+        .upsert({
+          user_id: user.id,
+          broker_type: "binance",
+          encrypted_api_key: binanceKey, // Storing plain text
+          encrypted_api_secret: binanceSecret,
+          test_status: "pending"
+        }, { onConflict: "user_id, broker_type" });
+
+      if (directError) throw directError;
 
       setBinanceStatus("pending");
       toast({
         title: "API Keys salvas",
-        description: "Suas credenciais da Binance foram salvas.",
+        description: "Suas credenciais da Binance foram salvas (Modo Direto).",
       });
 
       setBinanceKey("");

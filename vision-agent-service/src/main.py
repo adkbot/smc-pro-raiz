@@ -369,7 +369,7 @@ class VisionTradingAgent:
             return True
             
         except Exception as e:
-            logger.error(f"Error processing video: {e}", exc_info=True)
+            logger.error(f"Error processing video: {e}")
             self.supabase.update_video_status(
                 video_id,
                 'failed',
@@ -606,7 +606,7 @@ def main():
         logger.info("Agent stopped by user")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
+        logger.error(f"Fatal error: {e}")
         sys.exit(1)
 
 

@@ -149,13 +149,16 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       */
 
       // Direct insert (Unencrypted for now)
+      const trimmedKey = binanceKey.trim();
+      const trimmedSecret = binanceSecret.trim();
+
       const { error: directError } = await supabase
         .from("user_api_credentials")
         .upsert({
           user_id: user.id,
           broker_type: "binance",
-          encrypted_api_key: binanceKey, // Storing plain text
-          encrypted_api_secret: binanceSecret,
+          encrypted_api_key: trimmedKey, // Storing plain text
+          encrypted_api_secret: trimmedSecret,
           test_status: "pending"
         }, { onConflict: "user_id, broker_type" });
 

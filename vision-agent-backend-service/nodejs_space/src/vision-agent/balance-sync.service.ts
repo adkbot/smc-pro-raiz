@@ -64,54 +64,91 @@ export class BalanceSyncService {
                     api_secret: cred.encrypted_api_secret
                 });
             }
-            this.logger.debug(`✅ Spot Balance: ${spotUsdt} USDT`);
-        } catch (e) {
-            this.logger.warn(`❌ Failed to fetch Spot balance for user ${user.user_id}: ${e.message}`);
+        } catch (error) {
+            this.logger.error(`Error in syncBalances: ${error.message}`);
         }
-
-        // 2. Fetch Futures Balance
-        try {
-            this.logger.debug(`Fetching FUTURES balance for ${user.user_id}...`);
-            // @ts-ignore
-            const futuresExchange = new ccxt.binance({
-                apiKey: user.api_key,
-                secret: user.api_secret,
-                enableRateLimit: true,
-                options: { defaultType: 'future', recvWindow: 60000 },
-            });
-            const futuresBalance = await futuresExchange.fetchBalance();
-            const futuresUsdt = futuresBalance.total['USDT'] || 0;
-            totalUsdt += futuresUsdt;
-            fetchSuccess = true;
-            this.logger.debug(`✅ Futures Balance: ${futuresUsdt} USDT`);
-        } catch (e) {
-            this.logger.warn(`⚠️ Failed to fetch Futures balance (might be disabled): ${e.message}`);
-        }
-
-        if (!fetchSuccess) {
-            this.logger.warn(`❌ Skipping balance update for user ${user.user_id} because both Spot and Futures fetch failed.`);
-            return;
-        }
-
-        const supabase = this.supabaseService.getClient();
-        if (!supabase) {
-            throw new Error('Supabase client not initialized');
-        }
-
-        // Update Supabase
-        const { error } = await supabase
-            .from('user_settings')
-            .update({ balance: totalUsdt, updated_at: new Date().toISOString() })
-            .eq('user_id', user.user_id);
-
-        if (error) {
-            this.logger.error(`❌ Failed to update balance in DB for user ${user.user_id}: ${error.message}`);
-        } else {
-            this.logger.log(`💰 Balance updated for user ${user.user_id}: $${totalUsdt.toFixed(2)}`);
-        }
-
-    } catch(error) {
-        this.logger.error(`🔥 Critical error syncing balance for user ${user.user_id}: ${error.message}`);
     }
-}
+
+    private async syncUserBalance(user: { user_id: string, api_key: string, api_secret: string }) {
+        let fetchSuccess = false;
+        let totalUsdt = 0;
+
+        this.logger.log(`🔄 Syncing balance for user ${user.user_id}...`);
+
+        try {
+            const apiKey = user.api_key.trim();
+            const apiSecret = user.api_secret.trim();
+
+            // Debug log to check key validity (without exposing the full key)
+            if (apiKey.length > 5 && apiSecret.length > 5) {
+                this.logger.debug(`User ${user.user_id} Key Start: ${apiKey.substring(0, 5)}..., Secret Start: ${apiSecret.substring(0, 5)}...`);
+            } else {
+                this.logger.warn(`User ${user.user_id} Key/Secret too short! Key: ${apiKey.length}, Secret: ${apiSecret.length}`);
+            }
+
+            // @ts-ignore
+            const exchange = new ccxt.binance({
+                apiKey: apiKey,
+                secret: apiSecret,
+                enableRateLimit: true,
+                options: { recvWindow: 60000 },
+            });
+
+            // 1. Fetch Spot Balance
+            try {
+                this.logger.debug(`Fetching SPOT balance for ${user.user_id}...`);
+                const spotBalance = await exchange.fetchBalance();
+                const spotUsdt = spotBalance.total['USDT'] || 0;
+                totalUsdt += spotUsdt;
+                fetchSuccess = true;
+                this.logger.debug(`✅ Spot Balance: ${spotUsdt} USDT`);
+            } catch (e) {
+                this.logger.warn(`❌ Failed to fetch Spot balance for user ${user.user_id}: ${e.message}`);
+            }
+
+            // 2. Fetch Futures Balance
+            try {
+                this.logger.debug(`Fetching FUTURES balance for ${user.user_id}...`);
+                // @ts-ignore
+                const futuresExchange = new ccxt.binance({
+                    apiKey: apiKey,
+                    secret: apiSecret,
+                    enableRateLimit: true,
+                    options: { defaultType: 'future', recvWindow: 60000 },
+                });
+                const futuresBalance = await futuresExchange.fetchBalance();
+                const futuresUsdt = futuresBalance.total['USDT'] || 0;
+                totalUsdt += futuresUsdt;
+                fetchSuccess = true;
+                this.logger.debug(`✅ Futures Balance: ${futuresUsdt} USDT`);
+            } catch (e) {
+                this.logger.warn(`⚠️ Failed to fetch Futures balance (might be disabled): ${e.message}`);
+            }
+
+            if (!fetchSuccess) {
+                this.logger.warn(`❌ Skipping balance update for user ${user.user_id} because both Spot and Futures fetch failed.`);
+                return;
+            }
+
+            const supabase = this.supabaseService.getClient();
+            if (!supabase) {
+                throw new Error('Supabase client not initialized');
+            }
+
+            // Update Supabase
+            const { error } = await supabase
+                .from('user_settings')
+                .update({ balance: totalUsdt, updated_at: new Date().toISOString() })
+                .eq('user_id', user.user_id);
+
+            if (error) {
+                this.logger.error(`❌ Failed to update balance in DB for user ${user.user_id}: ${error.message}`);
+            } else {
+                this.logger.log(`💰 Balance updated for user ${user.user_id}: $${totalUsdt.toFixed(2)}`);
+            }
+
+        } catch (error) {
+            this.logger.error(`🔥 Critical error syncing balance for user ${user.user_id}: ${error.message}`);
+        }
+    }
 }

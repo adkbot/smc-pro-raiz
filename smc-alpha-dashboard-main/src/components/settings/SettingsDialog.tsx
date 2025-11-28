@@ -157,6 +157,26 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
       if (directError) throw directError;
 
+      // Automatically disable Paper Mode and Enable Auto Trading when keys are added
+      const { error: settingsError } = await supabase
+        .from("user_settings")
+        .update({
+          paper_mode: false,
+          auto_trading_enabled: true
+        })
+        .eq("user_id", user.id);
+
+      if (settingsError) {
+        console.error("Failed to auto-update settings:", settingsError);
+      } else {
+        setPaperMode(false);
+        setAutoTrading(true);
+        toast({
+          title: "Modo Real Ativado",
+          description: "Sua conta foi configurada para operar em Modo Real automaticamente.",
+        });
+      }
+
       setBinanceStatus("pending");
       toast({
         title: "API Keys salvas",

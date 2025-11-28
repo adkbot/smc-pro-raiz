@@ -69,16 +69,20 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
       const { data: credentials } = await supabase
         .from("user_api_credentials")
-        .select("broker_type, test_status, broker_name")
+        .select("broker_type, test_status, broker_name, encrypted_api_key, encrypted_api_secret")
         .eq("user_id", user.id);
 
       if (credentials) {
         credentials.forEach((cred) => {
           if (cred.broker_type === "binance") {
             setBinanceStatus(cred.test_status as any || "pending");
+            if (cred.encrypted_api_key) setBinanceKey(cred.encrypted_api_key);
+            if (cred.encrypted_api_secret) setBinanceSecret(cred.encrypted_api_secret);
           } else if (cred.broker_type === "forex") {
             setForexStatus(cred.test_status as any || "pending");
             if (cred.broker_name) setForexBroker(cred.broker_name);
+            if (cred.encrypted_api_key) setForexKey(cred.encrypted_api_key);
+            if (cred.encrypted_api_secret) setForexSecret(cred.encrypted_api_secret);
           }
         });
       }
@@ -183,8 +187,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
         description: "Suas credenciais da Binance foram salvas (Modo Direto).",
       });
 
-      setBinanceKey("");
-      setBinanceSecret("");
+      // Keys are NOT cleared so the user can see them
     } catch (error: any) {
       toast({
         title: "Erro",
